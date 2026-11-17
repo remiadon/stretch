@@ -39,3 +39,17 @@ where = ["src"]
 Homepage = "https://github.com/lcornanguer/stretch"
 Repository = "https://github.com/lcornanguer/stretch"
 Issues = "https://github.com/lcornanguer/stretch/issues"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-benchmark>=5.3.1",
+    "pytest-memray>=1.11.0",
+]
+
+[tool.pytest.ini_options]
+# Every run saves timings to .benchmarks/<OS-Python-version>/NNNN_*.json and fails if any
+# case's `min` time is >10% slower than run 0001, the upstream baseline (0001_upstream.json).
+# Timings only compare within one OS/Python version. To record the baseline for a new one,
+# check out upstream (a55e9d9) and run: pytest -o addopts="" --benchmark-save=upstream
+addopts = "--benchmark-autosave --benchmark-compare=0001 --benchmark-compare-fail=min:10%"
