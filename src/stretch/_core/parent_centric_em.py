@@ -1,12 +1,10 @@
 import math
 
 from .utils import universal_integer_encoding, universal_real_encoding
+from . import jax_em
 
-import jax
 import numpy as np
 from itertools import product
-
-from .jax_em import em_jit
 
 import scipy.stats
 from scipy.special import logsumexp
@@ -910,7 +908,7 @@ class FHMM_ParentSet:
         if isinstance(Y, list): Y = np.array(Y)
         self._initialize_parameters(Y, X_dict)
         if not (self.use_lasso or self.pruning) and self.M == 1:
-            return self._fit_jax()
+            return jax_em.fit(self)
 
         # 2. PRE-CALCULATE ALL REGRESSOR DATA ONCE
         self._precalculate_Z_per_node(X_dict, Y)
@@ -968,25 +966,6 @@ class FHMM_ParentSet:
         if all_zeroed: return - np.inf
 
         return finalLL #log_likelihood_history[-1]
-
-    def _fit_jax(self):
-        """The EM loop of fit() as one jitted XLA call (jax_em.py), for one hidden parent."""
-        fixed, (name,) = self.get_ols_mapping()
-        p = self.parents[name]
-        Zc = np.column_stack([np.ones_like(self.Y_eff), self.Y_prev] + [self.parents[n]["Z_fixed_path"] for n in fixed])
-        Zh = np.stack([p["Z"][s] for s in range(len(p["Z"]))])
-        phi0 = np.concatenate([self.base_phi] + [self.parents[n]["phi"] for n in fixed + [name]])
-        with jax.enable_x64(True):
-            r = em_jit(Zc, Zh, self.Y_eff, phi0, self.Sigma[0], self.A_joint, p["pi"] / p["pi"].sum(),
-                       p["mask"].astype(float), self.tol, max_iter=self.max_iter)
-            r = {k: np.asarray(v) for k, v in r.items()}
-        self.scatter_phi(r["phi"])
-        self.Sigma = r["sigma"][None]
-        p["A"], p["A_counts"], p["pi"] = r["A"], r["A_counts"], r["pi"]
-        self.A_joint = self._calculate_joint_transition_matrix()
-        if any(not np.any(d["phi"]) for d in self.parents.values()):
-            return -np.inf
-        return float(r["ll"]) + sum(self.parents[f]["fixed_ll"] for f in self.fixed_parent_names)
 
     def get_allowed_states(self, delays):
         mini = min(delays)

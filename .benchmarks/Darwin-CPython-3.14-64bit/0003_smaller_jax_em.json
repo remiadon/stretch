@@ -1,0 +1,199 @@
+{
+    "machine_info": {
+        "node": "Mac.lan",
+        "processor": "arm",
+        "machine": "arm64",
+        "python_compiler": "Clang 21.1.4 ",
+        "python_implementation": "CPython",
+        "python_implementation_version": "3.14.2",
+        "python_version": "3.14.2",
+        "python_build": [
+            "main",
+            "Dec 17 2025 20:54:49"
+        ],
+        "release": "25.6.0",
+        "system": "Darwin",
+        "cpu": {
+            "python_version": "3.14.2.final.0 (64 bit)",
+            "cpuinfo_version": [
+                10,
+                1,
+                1
+            ],
+            "cpuinfo_version_string": "10.1.1",
+            "arch": "ARM_8",
+            "bits": 64,
+            "count": 12,
+            "arch_string_raw": "arm64",
+            "brand_raw": "Apple M4 Pro"
+        }
+    },
+    "commit_info": {
+        "id": "584cbf0383c95d1fae9934aa1dbd1d38c7b67a41",
+        "time": "2026-11-17T17:29:55+01:00",
+        "author_time": "2026-11-17T17:29:55+01:00",
+        "dirty": true,
+        "project": "stretch",
+        "branch": "faster-stretch"
+    },
+    "benchmarks": [
+        {
+            "group": null,
+            "name": "test_speed[readme_greedy]",
+            "fullname": "tests/test_regression.py::test_speed[readme_greedy]",
+            "params": {
+                "case": "readme_greedy"
+            },
+            "param": "readme_greedy",
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "precision": null,
+                "confidence": null,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.013457249995553866,
+                "max": 0.013813624973408878,
+                "mean": 0.013620680324189985,
+                "stddev": 0.00018001139561118633,
+                "rounds": 3,
+                "median": 0.013591166003607213,
+                "iqr": 0.00026728123339125887,
+                "q1": 0.013490728997567203,
+                "q3": 0.013758010230958462,
+                "iqr_outliers": 0,
+                "stddev_outliers": 1,
+                "outliers": "1;0",
+                "ld15iqr": 0.013457249995553866,
+                "hd15iqr": 0.013813624973408878,
+                "ops": 73.41777181452714,
+                "total": 0.04086204097256996,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_speed[readme_exhaustive]",
+            "fullname": "tests/test_regression.py::test_speed[readme_exhaustive]",
+            "params": {
+                "case": "readme_exhaustive"
+            },
+            "param": "readme_exhaustive",
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "precision": null,
+                "confidence": null,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.01356179200229235,
+                "max": 0.014616416010539979,
+                "mean": 0.013961430338288968,
+                "stddev": 0.0005718038529882727,
+                "rounds": 3,
+                "median": 0.013706083002034575,
+                "iqr": 0.0007909680061857216,
+                "q1": 0.013597864752227906,
+                "q3": 0.014388832758413628,
+                "iqr_outliers": 0,
+                "stddev_outliers": 1,
+                "outliers": "1;0",
+                "ld15iqr": 0.01356179200229235,
+                "hd15iqr": 0.014616416010539979,
+                "ops": 71.62589904972117,
+                "total": 0.0418842910148669,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_speed[readme_topic]",
+            "fullname": "tests/test_regression.py::test_speed[readme_topic]",
+            "params": {
+                "case": "readme_topic"
+            },
+            "param": "readme_topic",
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "precision": null,
+                "confidence": null,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.013348459004191682,
+                "max": 0.01370737500838004,
+                "mean": 0.013549319672165439,
+                "stddev": 0.00018324681944277497,
+                "rounds": 3,
+                "median": 0.013592125003924593,
+                "iqr": 0.0002691870031412691,
+                "q1": 0.01340937550412491,
+                "q3": 0.013678562507266179,
+                "iqr_outliers": 0,
+                "stddev_outliers": 1,
+                "outliers": "1;0",
+                "ld15iqr": 0.013348459004191682,
+                "hd15iqr": 0.01370737500838004,
+                "ops": 73.80444363227434,
+                "total": 0.040647959016496316,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_speed[chain4_greedy]",
+            "fullname": "tests/test_regression.py::test_speed[chain4_greedy]",
+            "params": {
+                "case": "chain4_greedy"
+            },
+            "param": "chain4_greedy",
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "precision": null,
+                "confidence": null,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.1330816250119824,
+                "max": 0.14672616601455957,
+                "mean": 0.14021558333964398,
+                "stddev": 0.006843597204400605,
+                "rounds": 3,
+                "median": 0.14083895899238996,
+                "iqr": 0.010233405751932878,
+                "q1": 0.1350209585070843,
+                "q3": 0.14525436425901717,
+                "iqr_outliers": 0,
+                "stddev_outliers": 1,
+                "outliers": "1;0",
+                "ld15iqr": 0.1330816250119824,
+                "hd15iqr": 0.14672616601455957,
+                "ops": 7.1318749042159,
+                "total": 0.4206467500189319,
+                "iterations": 1
+            }
+        }
+    ],
+    "datetime": "2026-11-17T17:12:35.756280+00:00",
+    "version": "5.3.1"
+}

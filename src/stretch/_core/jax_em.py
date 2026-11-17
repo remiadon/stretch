@@ -1,100 +1,57 @@
-"""Whole EM loop of FHMM_ParentSet.fit in one XLA call, for one hidden parent (the default path).
+"""FHMM_ParentSet.fit's EM loop as one XLA call, for the default path (one hidden parent, no lasso, no pruning).
 
-Same maths as _forward_backward + _maximization_step, except that only sum_t xi_t is formed
-(never the (T, N, N) tensor) and the weighted least squares is solved via normal equations in
-the same standardised basis instead of stacking a (T*N, p) design for sklearn.
-Callers must run it under `jax.enable_x64(True)`.
+E-step: gamma and sum_t xi_t are gradients of the forward log-likelihood (gamma = E dll/dE,
+xi = A dll/dA), so there is no backward pass and no (T, N, N) xi tensor.
+M-step: upstream's weighted least squares on the stacked (N*T, p) design, without sklearn.
 """
 import math
 
 import jax
 import jax.numpy as jnp
-from jax import lax
-
-LN2 = math.log(2)
+import numpy as np
 
 
-def _estep(Zc, Zh, y, phi, sigma, A, pi):
-    pc = Zc.shape[1]
-    mu = (Zc @ phi[:pc])[:, None] + (Zh @ phi[pc:]).T  # (T, N)
-    s = jnp.maximum(sigma, 1e-9)
-    logE = -0.5 * jnp.log2(2 * jnp.pi * s) - 0.5 * ((y[:, None] - mu) ** 2 / s) / LN2
-    E = jnp.maximum(jnp.exp2(jnp.clip(logE, -700, None)), 1e-300)
-    N = E.shape[1]
+def _loglik(E, A, pi):  # scaled forward pass, natural log
+    def step(a, e):
+        a = (a @ A) * e
+        return a / a.sum(), jnp.log(a.sum())
+
     a0 = pi * E[0]
-    s0 = a0.sum()
-    a0 = jnp.where(s0 == 0, 1.0 / N, a0)
-    s0 = jnp.where(s0 == 0, 1.0, s0)
-    a0 = a0 / s0
-
-    def fwd(a_prev, e):
-        a = (a_prev @ A) * e
-        sc = a.sum()
-        a = jnp.where(sc == 0, a_prev, a / sc)
-        return a, (a, jnp.where(sc == 0, 0.0, jnp.log2(sc)))
-
-    _, (alpha_rest, lls) = lax.scan(fwd, a0, E[1:])
-    alpha = jnp.vstack([a0[None], alpha_rest])
-    ll = jnp.log2(s0) + lls.sum()
-
-    def bwd(b_next, e_next):
-        b = A @ (e_next * b_next)
-        sc = b.sum()
-        b = jnp.where(sc > 0, b / sc, 1.0 / N)
-        return b, b
-
-    _, beta_rev = lax.scan(bwd, jnp.ones(N), E[1:][::-1])
-    beta = jnp.vstack([beta_rev[::-1], jnp.ones((1, N))])
-    gamma = alpha * beta
-    gamma = gamma / gamma.sum(1, keepdims=True)
-    # sum_t xi_t = A * sum_t outer(alpha_t / d_t, E_{t+1} beta_{t+1}); uninformative steps fall back to A / sum(A)
-    eb = E[1:] * beta[1:]
-    d = ((alpha[:-1] @ A) * eb).sum(1)
-    ok = d > 1e-12
-    S = jnp.where(ok[:, None], alpha[:-1] / jnp.where(ok, d, 1.0)[:, None], 0.0).T @ eb
-    xi = A * S + (~ok).sum() * A / A.sum()
-    return ll, gamma, xi
+    _, logs = jax.lax.scan(step, a0 / a0.sum(), E[1:])
+    return jnp.log(a0.sum()) + logs.sum()
 
 
-def _mstep(Zc, Zh, y, gamma, xi, mask, pi):
-    T, pc = Zc.shape
-    N, _, k = Zh.shape
-    p = pc + k
-    w = gamma.sum(1)
-    H = jnp.einsum("ts,stk->tk", gamma, Zh)
-    Wz = Zh * gamma.T[:, :, None]
-    G = jnp.zeros((p, p))
-    G = G.at[:pc, :pc].set((Zc * w[:, None]).T @ Zc)
-    G = G.at[:pc, pc:].set(Zc.T @ H).at[pc:, :pc].set(H.T @ Zc)
-    G = G.at[pc:, pc:].set(Wz.reshape(-1, k).T @ Zh.reshape(-1, k))
-    b = jnp.concatenate([Zc.T @ (w * y), H.T @ y])
-    # Standardise columns 1.. with their weighted mean/std, like upstream, then map back.
-    W = w.sum()
-    mu = G[0, 1:] / W
-    sd = jnp.sqrt(jnp.maximum(jnp.diag(G)[1:] / W - mu ** 2, 0))
-    sd = jnp.where(sd < 1e-9, 1.0, sd)
-    Mt = jnp.eye(p).at[0, 1:].set(-mu / sd).at[1:, 1:].set(jnp.diag(1 / sd))
-    phi = Mt @ jnp.linalg.lstsq(Mt.T @ G @ Mt, Mt.T @ b)[0]
-    mu_all = (Zc @ phi[:pc])[:, None] + (Zh @ phi[pc:]).T
-    sigma = jnp.maximum(jnp.sum(gamma * (y[:, None] - mu_all) ** 2) / T, 1e-6)
-    An = (xi + 1.0) * mask
-    rs = An.sum(1, keepdims=True)
-    A = jnp.where(rs != 0, An / jnp.where(rs != 0, rs, 1.0), 1.0 / N)
-    return phi, sigma, A, pi / pi.sum(), An  # pi is never re-estimated upstream either
-
-
-def em(Zc, Zh, y, phi, sigma, A, pi, mask, tol, max_iter):
-    def cond(c):
-        return (c[6] < max_iter) & ~c[7]
-
+@jax.jit
+def _em(Z, y, phi, sigma, A, pi, mask, tol, max_iter):  # Z: (N states, T, p)
     def body(c):
-        phi, sigma, A, pi, prev, _, it, _, _ = c
-        ll, gamma, xi = _estep(Zc, Zh, y, phi, sigma, A, pi)
-        phi, sigma, A, pi, An = _mstep(Zc, Zh, y, gamma, xi, mask, pi)
-        return phi, sigma, A, pi, ll, ll, it + 1, jnp.abs(ll - prev) < tol, An
+        phi, sigma, A, _, ll, _, it = c
+        s = jnp.maximum(sigma, 1e-9)
+        E = jnp.maximum(jnp.exp(-0.5 * (jnp.log(2 * jnp.pi * s) + (y - Z @ phi) ** 2 / s)), 2.0 ** -700).T
+        new_ll, (dE, dA) = jax.value_and_grad(_loglik, (0, 1))(E, A, pi)
+        gamma, xi = jnp.maximum(E * dE, 0), A * dA  # clamp: roundoff gives -1e-17 on impossible states
+        w = jnp.sqrt(gamma.T)[..., None]
+        X, Y = (w * Z).reshape(-1, Z.shape[2]), (w[..., 0] * y).ravel()
+        phi = jnp.linalg.solve(X.T @ X, X.T @ Y)  # ponytail: normal equations square the condition number; lstsq if fits go unstable (1.8x slower)
+        sigma = jnp.maximum(jnp.sum(gamma.T * (y - Z @ phi) ** 2) / len(y), 1e-6)
+        counts = (xi + 1.0) * mask
+        new_ll = new_ll / math.log(2)
+        return phi, sigma, counts / counts.sum(1, keepdims=True), counts, new_ll, jnp.abs(new_ll - ll) < tol, it + 1
 
-    c = lax.while_loop(cond, body, (phi, sigma, A, pi, -jnp.inf, -jnp.inf, 0, False, A))
-    return dict(phi=c[0], sigma=c[1], A=c[2], pi=c[3], ll=c[5], A_counts=c[8])
+    return jax.lax.while_loop(lambda c: (c[6] < max_iter) & ~c[5], body, (phi, sigma, A, A, -jnp.inf, False, 0))
 
 
-em_jit = jax.jit(em, static_argnames="max_iter")
+def fit(m):
+    fixed, (name,) = m.get_ols_mapping()
+    p = m.parents[name]
+    Zc = np.column_stack([np.ones_like(m.Y_eff), m.Y_prev] + [m.parents[n]["Z_fixed_path"] for n in fixed])
+    Z = np.stack([np.hstack([Zc, z]) for z in p["Z"].values()])
+    phi = np.concatenate([m.base_phi] + [m.parents[n]["phi"] for n in fixed + [name]])
+    with jax.enable_x64(True):
+        r = _em(Z, m.Y_eff, phi, m.Sigma[0], m.A_joint, p["pi"] / p["pi"].sum(), p["mask"], m.tol, m.max_iter)
+        phi, sigma, p["A"], p["A_counts"], ll = (np.asarray(v) for v in r[:5])
+    m.scatter_phi(phi)
+    m.Sigma = sigma[None]
+    m.A_joint = m._calculate_joint_transition_matrix()
+    if any(not np.any(d["phi"]) for d in m.parents.values()):
+        return -np.inf
+    return float(ll) + sum(m.parents[f]["fixed_ll"] for f in m.fixed_parent_names)
