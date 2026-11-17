@@ -44,10 +44,10 @@ def chain_data(n_vars=4, T=200, seed=0):
 
 
 CASES = {  # name: (data, STRETCH params, upstream peak memory)
-    "readme_greedy": (readme_data, dict(search="greedy", max_lag=3), "1400 KB"),
-    "readme_exhaustive": (readme_data, dict(search="exhaustive", max_lag=3), "587 KB"),
-    "readme_topic": (readme_data, dict(search="topic", max_lag=3), "643 KB"),
-    "chain4_greedy": (chain_data, dict(search="greedy", max_lag=3), "4198 KB"),
+    "readme_greedy": (readme_data, dict(search="greedy", max_lag=3), "500 KB"),
+    "readme_exhaustive": (readme_data, dict(search="exhaustive", max_lag=3), "400 KB"),
+    "readme_topic": (readme_data, dict(search="topic", max_lag=3), "500 KB"),
+    "chain4_greedy": (chain_data, dict(search="greedy", max_lag=3), "3700 KB"),
 }
 
 
@@ -69,11 +69,18 @@ def check_golden(case, result):
     assert got == json.loads(path.read_text())
 
 
+@pytest.fixture
+def warm_jit(case):
+    # One untracked fit first (memray only tracks the test body): the bar covers fitting, not one-off XLA compiles.
+    make_data, params, _ = CASES[case]
+    STRETCH(**params).fit_result(make_data())
+
+
 # Separate from test_speed: the limit_memory marker turns memray on, which would skew timings.
 @pytest.mark.parametrize(
     "case", [pytest.param(c, marks=pytest.mark.limit_memory(mem)) for c, (*_, mem) in CASES.items()]
 )
-def test_matches_upstream(case):
+def test_matches_upstream(case, warm_jit):
     make_data, params, _ = CASES[case]
     check_golden(case, STRETCH(**params).fit_result(make_data()))
 

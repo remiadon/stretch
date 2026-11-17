@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 from ..edge_fitting import fit_edge
 from itertools import permutations

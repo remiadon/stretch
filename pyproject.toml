@@ -7,7 +7,7 @@ name = "stretch-tscd"
 version = "0.1.1"
 description = "Causal discovery for nonstationary time series with varying causal delays"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "BSD-3-Clause"
 authors = [
   {name = "Lénaïg Cornanguer"},
@@ -21,12 +21,12 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
+  "jax>=0.8",
   "networkx>=3.0",
   "numpy>=1.24",
   "pandas>=2.0",
   "scikit-learn>=1.2",
   "scipy>=1.10",
-  "torch>=2.0",
 ]
 
 [project.scripts]
